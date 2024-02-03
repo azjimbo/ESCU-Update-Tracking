@@ -1,0 +1,244 @@
+<form>
+  <label>ES Content Update Change Tracking</label>
+  <!--Created by James Callahan www.professionalparanoid.com Feb 2024-->
+  <description>Used to identify changes to available searches between updates</description>
+  <init>
+    <set token="title_tok">*</set>
+  </init>
+  <search id="escu_base">
+    <query>
+       | inputlookup $source_tokM1$
+        | search title="*Rule"
+        | append
+          [| inputlookup $source_tokM2$
+          | search title="*Rule"
+          ]
+        | where NOT match(title, "($exclude$)")
+
+        | stats
+        first(description) as first_description first(disabled) as first_disabled
+        first(modification_date) as first_modification_date  first(search) as first_search
+        last(description) as last_description last(disabled) as last_disabled last(modification_date) as last_modification_date last(search) as last_search dc(description) as description_c dc(disabled) as disabled_c
+        dc(modification_date) as modification_date_c  dc(search) as search_c
+        count by title        
+
+        | search (description_c&gt;1 OR disabled_c&gt;1 OR modification_date_c&gt;1 OR search_c&gt;1 OR count=1) 
+        | table count title  first_modification_date last_modification_date modification_date_c first_description last_description description_c first_disabled last_disabled disabled_c first_search last_search search_c
+        | eval changed=case(disabled_c=2, "Disabled/Enabled State",search_c=2, "Search", description_c=2, "Description", modification_date_c=2,"Modifiction Date", count=1, "Added/Removed")
+        | eval status=if(last_disabled=0,"Enabled", "Disabled")
+        | search $chngd$  
+      </query>
+    <earliest>-4h</earliest>
+    <latest>now</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <search>
+    <query> 
+      |makeresults |eval not_these=$exclude$ |rex mode=sed field=not_these "s/\,/ /g s/\st/\|/g"
+      </query>
+    <progress>
+      <set token="not_thesem">$not_these$</set>
+    </progress>
+  </search>
+  <fieldset submitButton="true">
+    <input type="dropdown" token="source_tokM1">
+      <label>select first source csv</label>
+      <fieldForLabel>file_choice</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search id="csvSel">
+        <query>
+          | rest /services/data/lookup-table-files
+          | search title="*ESCU*ver*"
+          | rex field=title "ESCU\_(?&lt;dtg&gt;.*)\_ESCU_ver\_(?&lt;ver&gt;.*)\.csv"
+          | eval timesort=strptime(dtg, "%H:%M_%d-%b-%Y")
+          | sort - timesort
+          | table timesort dtg ver title eai:userName
+          | eval file_choice=(ver+" from "+dtg)
+        </query>
+      </search>
+    </input>
+    <input type="dropdown" token="source_tokM2">
+      <label>select a source csv to compare</label>
+      <fieldForLabel>file_choice</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search base="csvSel">
+        <query>
+        </query>
+      </search>
+    </input>
+    <input type="text" token="exclude" searchWhenChanged="true">
+      <label>Title Exclude (Pipe Seperated |)</label>
+      <default>(none)</default>
+      <prefix/>
+      <suffix/>
+      <initialValue></initialValue>
+    </input>
+    <input type="dropdown" token="chngd" searchWhenChanged="true">
+      <label>Only these changes</label>
+      <choice value="&quot;Search&quot;">Search</choice>
+      <choice value="&quot;Added/Removed&quot;">Added/Removed</choice>
+      <!--     <choice value="&quot;Creation Date&quot;">Creation Date</choice> -->
+      <choice value="&quot;Description&quot;">Description</choice>
+      <choice value="&quot;Disabled/Enabled State&quot;">Disabled/Enabled State</choice>
+      <choice value="*">All</choice>
+      <prefix>changed IN(</prefix>
+      <suffix>)</suffix>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="radio" token="reset_tok" searchWhenChanged="true" id="radiosample">
+      <label>Title Token Reset</label>
+      <choice value="retain">keep</choice>
+      <choice value="reset">reset</choice>
+      <default>retain</default>
+      <change>
+        <condition value="reset">
+          <set token="title_tok">*</set>
+          <set token="reset_tok">retain</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+
+<summary>
+<b>Dashboard Info/Guidance</b>
+</summary>
+<details>
+<summary>Overview - Getting Started</summary>
+<p>This dashboard provides a way to review what has changed between Versions
+(or just do a back up) of Enterprise Security Content Update. </p>
+<P>The query linked below will use the rest interface and generate a
+CSV file with all the Saved Searches on the system. </P>
+<p> The below panels will then present the differences between the two .csv files selected above. </p>
+<P>
+            <b>In order to get this to work properly</b>, you should run the below
+linked query twice - once before and once after applying the update. Running it
+just before applying the update will make sure you've captured any changes made
+since the last time the query was run.</P>
+
+<a class="btn default edit-cancel" href="./search?earliest=1517461200&amp;latest=1712203200&amp;q=%7C%20rest%20%2Fservices%2Fsaved%2Fsearches%20splunk_server%3Dlocal%20count%3D0%0A%7C%20rename%20%22action.escu.creation_date%22%20as%20creation_date%2C%20action.escu.modification_date%20AS%20modification_date%0A%7C%20eval%20datesort%3Dstrptime(creation_date%2C%20%22%25Y-%25m-%25d%22)%2Cmodsort%3Dstrptime(modification_date%2C%22%25Y-%25m-%25d%22)%0A%7C%20table%20datesort%20modsort%20creation_date%20modification_date%20eai%3Aacl.app%20title%20description%20disabled%20search%0A%7C%20sort%20-%20datesort%0A%0A%60%60%60uncomment%20the%20below%20after%20confirming%20that%20the%20above%20query%20works.%60%60%60%0A%60%60%60%7C%20outputlookup%20%0A%5B%7C%20rest%20%2Fservices%2Fconfigs%2Fconf-content-version%20splunk_server%3Dlocal%20count%3D0%20%7C%20table%20version%0A%7C%20eval%20nowers%3Dstrftime(now()%2C%22%25H%3A%25M_%25d-%25b-%25Y%22 )%20%0A%7C%20eval%20filename%3D%22ESCU_%22%2Bnowers%2B%22_ESCU_ver_%22%2Bversion%2B%22.csv%22%0A%20%20%20%20%7C%20return%20%24filename%5D%60%60%60" target="_blank">Open CSV Generating Query In New Tab</a> <br/>
+<P>
+  <a href="/manager/search/data/lookup-table-files?search=ESCU_v" target="_blank">Manage the csv files</a>
+</P>
+</details>
+
+<details>
+  <summary>Filtering</summary>
+  <p>Select the available source file descriptions you want to compare.  The analytics will run on Submit.</p>
+  <p>Not all Searches may be appropriate - use "Title Exclude" to bulk exclude some searches based on a term in the title.  Multiple terms should be pipe (|) seperated.  Don't use Azure?  Exclude those here.  Don't use Azure, AWS or Office 365? Use the pipe to seperate the exclude terms: "Azure|O365|AWS" etc.</p>
+  <p>Specific types of changes can be filtered for with "Only these changes"</p>
+  <p>You can filter the "Details" panel by clicking on a title in the "Rollup" panel.  After you've selected one, you can directly select a different one from the "Rollup" OR reset to all titles using the Title Token Reset radio button. </p>
+  
+</details>
+
+         <style>
+          #radiosample div[data-test="radio-list"]{
+           display: inline;
+          }  
+
+          #radiosample div[data-test="option"]{
+            display: inline;
+            margin-top: 0px;
+            margin-right: 10px;
+            margin-bottom: 0px;
+            margin-left: 0px
+          } 
+          #radiosample {
+            width:10%;
+          }
+        </style>
+
+</html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Change Tracking (filtered from Exclude above) |$source_tokM1$ and $source_tokM2$</title>
+      <table>
+        <search base="rollup_base">
+          <query>
+            |  stats count(eval(status="Enabled")) as "Changes to Enabled",count(eval(status="Disabled")) as "Changes to Disabled", count(eval(changed="Search")) as "Search Changed",count(eval(changed="Description")) as "Description Changed",count(eval(changed="Disabled/Enabled State")) as "State Changed",count(eval(changed="Added/Removed")) as "Added/Removed" dc(title) as "Total Searches with Delta"  
+          </query>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Rollup</title>
+      <table>
+        <title>Click a row below to filter the details panel for that specific title</title>
+        <search base="escu_base" id="rollup_base">
+          <query>
+          |table title status changed
+        </query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="title_tok">$row.title$</set>
+          <unset token="reset"></unset>
+          <set token="reset_tok">$retain$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Details</title>
+      <table>
+        <search base="escu_base">
+          <query>
+         |search title="$title_tok$" 
+          </query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="count">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="creation_date_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="modification_date_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="description_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="disabled_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="search_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

@@ -32,14 +32,6 @@
     <latest>now</latest>
     <sampleRatio>1</sampleRatio>
   </search>
-  <search>
-    <query> 
-      |makeresults |eval not_these=$exclude$ |rex mode=sed field=not_these "s/\,/ /g s/\st/\|/g"
-      </query>
-    <progress>
-      <set token="not_thesem">$not_these$</set>
-    </progress>
-  </search>
   <fieldset submitButton="true">
     <input type="dropdown" token="source_tokM1">
       <label>select first source csv</label>

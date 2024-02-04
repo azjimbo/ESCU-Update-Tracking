@@ -104,7 +104,7 @@
 (or just do a back up) of Enterprise Security Content Update. </p>
 <P>The query linked below will use the rest interface and generate a
 CSV file with all the Saved Searches on the system. </P>
-<p> The below panels will then present the differences between the two .csv files selected above. </p>
+<p> The below panels will then present the differences between the two .csv files selected above. In the 'Details' panel, a 1 in the Count field means it is new, or removed.  The other fields with _c stand for distinct count; these will be either 2 or 1.  This means the field Changed, or didn't change. </p>
 <P>
             <b>In order to get this to work properly</b>, you should run the below
 linked query twice - once before and once after applying the update. Running it
@@ -207,7 +207,7 @@ since the last time the query was run.</P>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
         <format type="color" field="count">
-          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <colorPalette type="list">[#F8BE34,#FFFFFF]</colorPalette>
           <scale type="threshold">2</scale>
         </format>
         <format type="color" field="creation_date_c">

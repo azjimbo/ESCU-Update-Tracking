@@ -1,6 +1,6 @@
-<form>
+<form version="1.2">
   <label>ES Content Update Change Tracking</label>
-  <!--Created by James Callahan www.professionalparanoid.com Feb 2024-->
+  <!--Created by James Callahan www.professionalparanoid.com 3 Feb 2024-->
   <description>Used to identify changes to available searches between updates</description>
   <init>
     <set token="title_tok">*</set>

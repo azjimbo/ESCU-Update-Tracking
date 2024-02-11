@@ -27,7 +27,7 @@
 		dc(description) as description_c,
 		first(disabled) as first_disabled, 
 		last(disabled) as last_disabled,
-		dc({disabled) as disabled_c,
+		dc(disabled) as disabled_c,
 		first(search) as first_search, 
 		last(search) as last_search,
 		dc(search) as search_c,

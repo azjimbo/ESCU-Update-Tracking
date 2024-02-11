@@ -1,0 +1,478 @@
+<form version="2.0">
+  <label>ES Content Update Change Tracking (with notable tracking)</label>
+  <!--Created by James Callahan www.professionalparanoid.com 12 Feb 2024-->
+  <description>Used to identify changes to available searches between updates</description>
+  <init>
+    <set token="title_tok">*</set>
+  </init>
+	  <search id="escu_base">
+		<query>
+	| inputlookup $source_tokM1$
+	| search title="*Rule"
+	| append
+	[| inputlookup $source_tokM2$
+	| search title="*Rule"
+	]
+	| where NOT match(title, "($exclude$)")
+
+	| stats values(eai:acl.app) AS eai:acl.app,
+		first(creation_date) as first_creation_date, 
+		last(creation_date) as last_creation_date, 
+		dc(creation_date) as creation_date_c,
+		first(modification_date) as first_modification_date,
+		last(modification_date) as last_modification_date,
+		dc(modification_date) as modification_date_c,
+		first(description) as first_description, 
+		last(description) as last_description,
+		dc(description) as description_c,
+		first(disabled) as first_disabled, 
+		last(disabled) as last_disabled,
+		dc({disabled) as disabled_c,
+		first(search) as first_search, 
+		last(search) as last_search,
+		dc(search) as search_c,
+		first(notable_default_disposition) as first_notable_default_disposition,
+		last(notable_default_disposition) as last_notable_default_disposition, 
+		dc(notable_default_disposition) as notable_default_disposition_c,
+		first(notable_default_owner) as first_notable_default_owner,
+		last(notable_default_owner) as last_notable_default_owner
+		dc(notable_default_owner) as notable_default_owner_c,
+		first(notable_default_status) as first_notable_default_status,
+		last(notable_default_status) as last_notable_default_status,
+		dc(notable_default_status) as notable_default_status_c,
+		first(notable_drilldown_earliest_offset) as first_notable_drilldown_earliest_offset,
+		last(notable_drilldown_earliest_offset) as last_notable_drilldown_earliest_offset,
+		dc(notable_drilldown_earliest_offset) as notable_drilldown_earliest_offset_c,
+		first(notable_drilldown_latest_offset) as first_notable_drilldown_latest_offset,
+		last(notable_drilldown_latest_offset) as last_notable_drilldown_latest_offset,
+		dc(notable_drilldown_latest_offset) as notable_drilldown_latest_offset_c,
+		first(notable_drilldown_name) as first_notable_drilldown_name,
+		last(notable_drilldown_name) as last_notable_drilldown_name,
+		dc(notable_drilldown_name) as notable_drilldown_name_c,
+		first(notable_drilldown_search) as first_notable_drilldown_search, 
+		last(notable_drilldown_search) as last_notable_drilldown_search, 
+		dc(notable_drilldown_search) as notable_drilldown_search_c,
+		first(notable_extract_artifacts) as first_notable_extract_artifacts, 
+		last(notable_extract_artifacts) as last_notable_extract_artifacts, 
+		dc(notable_extract_artifacts) as notable_extract_artifacts_c,
+		first(notable_extract_assets) as first_notable_extract_assets,
+		last(notable_extract_assets) as last_notable_extract_assets,
+		dc(notable_extract_assets) as notable_extract_assets_c,
+		first(notable_extract_identities) as first_notable_extract_identities,
+		last(notable_extract_identities) as last_notable_extract_identities,
+		dc(notable_extract_identities) as notable_extract_identities_c,
+		first(notable_nes_fields) as first_notable_nes_fields,
+		last(notable_nes_fields) as last_notable_nes_fields
+		dc(notable_nes_fields) as notable_nes_fields_c,
+		first(notable_next_steps) as first_notable_next_steps,
+		last(notable_next_steps) as last_notable_next_steps,
+		dc(notable_next_steps) as notable_next_steps_c,
+		first(notable_recommended_actions) as first_notable_recommended_actions,
+		last(notable_recommended_actions) as last_notable_recommended_actions,
+		dc(notable_recommended_actions) as notable_recommended_actions_c,
+		first(notable_rule_description) as first_notable_rule_description, 
+		last(notable_rule_description) as last_notable_rule_description, 
+		dc(notable_rule_description) as notable_rule_description_c,
+		first(notable_rule_title) as first_notable_rule_title,
+		last(notable_rule_title) as last_notable_rule_title,
+		dc(notable_rule_title) as notable_rule_title_c,
+		first(notable_security_domain) as first_notable_security_domain,
+		last(notable_security_domain) as last_notable_security_domain,
+		dc(notable_security_domain) as notable_security_domain_c,
+		first(notable_severity) as first_notable_severity,
+		last(notable_severity) as last_notable_severity,
+		dc(notable_severity) as notable_severity_c,
+		first(notable_verbose) as first_notable_verbose,
+		last(notable_verbose) as last_notable_verbose,
+		dc(notable_verbose) as notable_verbose_c
+		count by title
+
+	| search (count=1 OR
+		creation_date_c&gt;1 OR
+		modification_date_c&gt;1 OR
+		description_c&gt;1 OR
+		disabled_c&gt;1 OR
+		search_c&gt;1 OR
+		notable_default_disposition_c&gt;1 OR
+		notable_default_owner_c&gt;1 OR
+		notable_default_status_c&gt;1 OR
+		notable_drilldown_earliest_offset_c&gt;1 OR
+		notable_drilldown_latest_offset_c&gt;1 OR
+		notable_drilldown_name_c&gt;1 OR
+		notable_drilldown_search_c&gt;1 OR
+		notable_extract_artifacts_c&gt;1 OR
+		notable_extract_assets_c&gt;1 OR
+		notable_extract_identities_c&gt;1 OR
+		notable_nes_fields_c&gt;1 OR
+		notable_next_steps_c&gt;1 OR
+		notable_recommended_actions_c&gt;1 OR
+		notable_rule_description_c&gt;1 OR
+		notable_rule_title_c&gt;1 OR
+		notable_security_domain_c&gt;1 OR
+		notable_severity_c&gt;1 OR
+		notable_verbose_c&gt;1)
+
+	| eval changed=case(
+		count=1, "Added/Removed",
+		search_c&gt;1, "search",
+		description_c&gt;1, "Description",
+		disabled_c&gt;1, "Disabled/Enabled State",
+		notable_default_disposition_c&gt;1, "in notable",
+		notable_default_owner_c&gt;1, "in notable",
+		notable_default_status_c&gt;1, "in notable",
+		notable_drilldown_earliest_offset_c&gt;1, "in notable",
+		notable_drilldown_latest_offset_c&gt;1, "in notable",
+		notable_drilldown_name_c&gt;1, "in notable",
+		notable_drilldown_search_c&gt;1, "in notable",
+		notable_extract_artifacts_c&gt;1, "in notable",
+		notable_extract_assets_c&gt;1, "in notable",
+		notable_extract_identities_c&gt;1, "in notable",
+		notable_nes_fields_c&gt;1, "in notable",
+		notable_next_steps_c&gt;1, "in notable",
+		notable_recommended_actions_c&gt;1, "in notable",
+		notable_rule_description_c&gt;1, "in notable",
+		notable_rule_title_c&gt;1, "in notable",
+		notable_security_domain_c&gt;1, "in notable",
+		notable_severity_c&gt;1, "in notable",
+		notable_verbose_c&gt;1, "in notable"
+		)
+
+	| eval status=if(last_disabled=0, "Enabled", "Disabled")
+	| search $chngd$
+</query>
+    <earliest>-4h</earliest>
+    <latest>now</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <fieldset submitButton="true">
+    <input type="dropdown" token="source_tokM1">
+      <label>select first source csv</label>
+      <fieldForLabel>file_choice</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search id="csvSel">
+        <query>
+		| rest /services/data/lookup-table-files
+		| search title="*ESCU*ver*"
+		| rex field=title "ESCU\_(?&lt;dtg&gt;.*)\_ESCU(\_?)ver\_(?&lt;ver&gt;.*)\.csv"
+		| eval timesort=strptime(dtg, "%H_%2M_%d-%b-%Y")
+		| sort - timesort
+		| table timesort dtg ver title eai:userName
+		| eval file_choice=(ver+" from "+dtg)
+		</query>
+      </search>
+    </input>
+    <input type="dropdown" token="source_tokM2">
+      <label>select a source csv to compare</label>
+      <fieldForLabel>file_choice</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search base="csvSel">
+        <query>
+		</query>
+      </search>
+    </input>
+    <input type="text" token="exclude" searchWhenChanged="true">
+      <label>Title Exclude (Pipe Seperated |)</label>
+      <default>(none)</default>
+      <prefix/>
+      <suffix/>
+      <initialValue></initialValue>
+    </input>
+    <input type="dropdown" token="chngd" searchWhenChanged="true">
+      <label>Only these changes</label>
+      <choice value="&quot;search&quot;">Search</choice>
+      <choice value="&quot;Added/Removed&quot;">Added/Removed</choice>
+      <choice value="&quot;Description&quot;">Description</choice>
+      <choice value="&quot;Disabled/Enabled State&quot;">Disabled/Enabled State</choice>
+      <choice value="&quot;in notable&quot;">In Notable</choice>
+      <choice value="*">All</choice>
+      <prefix>changed IN(</prefix>
+      <suffix>)</suffix>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="radio" token="reset_tok" searchWhenChanged="true" id="radiosample">
+      <label>Title Token Reset</label>
+      <choice value="retain">keep</choice>
+      <choice value="reset">reset</choice>
+      <default>retain</default>
+      <change>
+        <condition value="reset">
+          <set token="title_tok">*</set>
+          <set token="reset_tok">retain</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+
+<summary>
+<b>Dashboard Info/Guidance</b>
+</summary>
+	<details>
+	<summary>Overview - Getting Started</summary>
+	<p>This dashboard provides a way to review what has changed between Versions (or just do a back up) of Enterprise Security Content Update.
+	</p>
+	<P>The query linked below will use the rest interface and generate a CSV file with all. the Saved Searches on the system. </P>
+	<p> The below panels will then present the differences between the two .csv files selected above. In the ‘Details’ panel, a '1' in the Count field means it is new, or removed. The other fields with "[field] Count" stand for distinct count: of that field; these will be either 2 or 1. This means the field Changed, or didn't change. </p>
+	<P>
+
+	<b>In order to get this to work properly</b>, you should run the below linked query twice - once before and once after applying the update. Running it just before applying the update will make sure you've captured any changes made since the last time the query was run.</P>
+
+	<a class="btn default edit-cancel" href="./search?q=%7C%20rest%20%2Fservices%2Fsaved%2Fsearches%20splunk_server%3Dlocal%20COUNT%3D0%0A%7C%20rename%20%22action.esc.creation_date%22%20as%20creation_date%2C%20action.escu.modification_date%20AS%20modification_date%0A%7C%20eval%20datesort%3Dstrptime(creation_date%2C%20%22%25Y-%25m-%25d4%22)%2Cmodsort%3Dstrptime(modification_date%2C%22%25Y-%25M-%25d%22)%0A%7C%20table%20datesort%20modsort%20creation_date%20modification_date%20eai%3Aacl.app%20title%20description%20disabled%20search%0A%7C%20sort%20-%20datesort%0A%0A%60%60%60uncomment%20the%20below%20after%20confirming%20that%20the%20above%20query%20works.%60%60%60%0A%60%60%60%7C%20outputlookup%20%0A%5B%7C%20rest%20%2Fservices%2Fconfigs%2Fconf-content-version%20splunk_server%3Dlocal%26count%3D0%20%7C%20table%20version%0A%7C%20eval%20nowers%3DstrFftime(now()%2C%22%25H%3A%25M_%25d-%25b-%25Y%22)%20%0A%7C%20eval%20Filename%3D%22ESCU_%22%2Bnowers%2B%22_ESCU_ver_%22%2Bversion%2B%22.csv%22%0A%20%20%20%20%7C%20return%20%24Filename%5D%60%60%60" target="_blank">Open CSV Generating Query In New Tab</a> <br/>
+	<P> 
+	<a href="/manager/search/data/lookup-table-files?search=ESCU" target="_blank">Manage the csv files</a>
+	</P>
+	<p>Open csv file in new tab: |inputlookup <a href="./search?q=%7C%20inputlookup%20$source_tokM1$" target="_blank">$source_tokM1$</a> or second file: |inputlookup
+	<a href=". /search?q=%7C%20inputlookup%20$source_tokM2$" target="_blank">$source_tokM2$</a> </p>
+	</details>
+	<details>
+	<summary>Filtering</summary>
+	<p>Select the available source file descriptions you want to compare. The analytics will run on Submit.</p>
+	<p>Not all Searches may be appropriate - use "Title Exclude" to bulk exclude some searches based on a term in the title.
+	Multiple terms should be pipe (|) seperated. Don't use Azure? Exclude those here. Don't use Azure, AWS or Office 365? Use the "|" pipe to seperate the exclude terms: "Azure|0365|AWS" etc.</p>
+	<p>Specific types of changes can be filtered for with "Only ‘these changes"</p>
+
+	<p>You can filter the "Details" panel by clicking on a title in the "Rollup" panel. After you've selected one, you can directly select a‘different one from the "Rollup" OR reset to all titles using the Title Token Reset radio button. </p>
+
+	</details>
+
+		<style>
+		#radiosample div[data-test="radio-list" ]{
+		display: inline;
+		}
+		#radiosample div[data-test="option" ]{
+		display: inline;
+		margin-top: 9px;
+		Margin-right: 10px;
+		margin-bottom: @px;
+		margin-left: @px
+		}
+		#radiosample {
+		width: 10%;
+		}
+		</style>
+
+	  </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Change Tracking (filtered from. Exclude above)
+		|$source_tokM1$ and $source_tokM2$</title>
+      <table>
+        <search base="rollup_base">
+          <query>
+			| stats count(eval(status="Enabled")) as "Changes to Enabled", 
+			count(eval(status="Disabled")) as "Changes to Disabled",
+			count(eval(changed="Search")) as "Search Changed", 
+			count(eval(changed="Description")) as "Description Changed" , 
+			count(eval(changed="Disabled/Enabled State")) as "State Changed", 
+			count(eval (changed="Added/Removed")) as "Added/Removed"
+			count(eval(changed="In Notable")) as "In Notable", 
+			dc(title) as "Total Titles with Changes"
+		  </query>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Rollup</title>
+      <table>
+        <title>Click a row below to filter the details panel for that specific title</title>
+        <search base="escu_base" id="rollup_base">
+          <query>
+			|table title status changed
+		  </query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="title_tok">$row.title$</set>
+          <unset token="reset"></unset>
+          <set token="reset_tok">$retain$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Details</title>
+      <table>
+        <search base="escu_base">
+          <query>
+			| eval ```datesort_c=if(datesort_c=1, "same", "diff"),
+			modsort_c=if(modsort_c=1,"same","diff"),```
+			creation_date_c=if(creation_date_c= 1,"same","diff"),
+			modification_date_c=if(modification_date_c=1, "same", "diff"),
+			description_c=if(description_c=1, "same", "diff"),
+			disabled_c=if(disabled_c=1,"same","diff"),
+			search_c=if(search_c=1, "same", "diff"),
+			notable_default_disposition_c=if(notable_default_disposition_c=1, "same", "diff"),
+			notable_default_owner_c=if(notable_default_owner_c=1,"same", "diff"),
+			notable_default_status_c=if(notable_default_status_c=1, "same", "diff"),
+			notable_drilldown_earliest_offset_c=if(notable_drilldown_earliest_offset_c=1,"same","diff"),
+			notable_drilldown_latest_offset_c=if(notable_drilldown_latest_offset_c=1, "same", "diff"),
+			notable_drilldown_name_c=if(notable_drilldown_name_c=1, "same", "diff"),
+			notable_drilldown_search_c=if(notable_drilldown_search_c=1, "same", "diff"),
+			notable_extract_artifacts_c=if(notable_extract_artifacts_c=1,"same","diff"),
+			notable_extract_assets_c=if(notable_extract_assets_c=1,"same","diff"),
+			notable_extract_identities_c=if(notable_extract_identities_c= 1,"same", "diff"),
+			notable_nes_fields_c=if(notable_nes_fields_c=1,"same","diff"),
+			notable_next_steps_c=if(notable_next_steps_c=1,"same", "diff"),
+			notable_recommended_actions_c=if(notable_recommended_actions_c=1,"same", "diff"),
+			notable_rule_description_c=if(notable_rule_description_c=1, "same","diff"),
+			notable_rule_title_c=if(notable_rule_title_c=1,"same","diff"),
+			notable_security_domain_c=if(notable_security_domain_c=1,"same","diff"),
+			notable_severity_c=if(notable_severity_c=1,"same", "diff"),
+			notable_verbose_c=if(notable_verbose_c=1,"same", "diff"),
+			
+			first_creation_date=if(count=1, "",first_creation_date),
+      first_description=if(count=1, "",first_description),
+      first_disabled=if(count=1, "",first_disabled),
+      first_modification_date=if(count=1, "",first_modification_date),
+      first_search=if(count=1, "",first_search),
+      first_notable_default_disposition=if(count=1, "",first_notable_default_disposition),
+      first_notable_default_owner=if(count=1, "",first_notable_default_owner),
+      first_notable_default_status=if(count=1, "",first_notable_default_status),
+      first_notable_drilldown_earliest_offset=if(count=1, "",first_notable_drilldown_earliest_offset),
+      first_notable_drilldown_latest_offset=if(count=1, "",first_notable_drilldown_latest_offset),
+      first_notable_drilldown_name=if(count=1, "",first_notable_drilldown_name),
+      first_notable_drilldown_search =if(count=1, "",first_notable_drilldown_search ),
+      first_notable_extract_artifacts =if(count=1, "",first_notable_extract_artifacts ),
+      first_notable_extract_assets=if(count=1, "",first_notable_extract_assets),
+      first_notable_extract_identities=if(count=1, "",first_notable_extract_identities),
+      first_notable_nes_fields=if(count=1, "",first_notable_nes_fields),
+      first_notable_next_steps=if(count=1, "",first_notable_next_steps),
+      first_notable_recommended_actions=if(count=1, "",first_notable_recommended_actions),
+      first_notable_rule_description =if(count=1, "",first_notable_rule_description ),
+      first_notable_rule_title=if(count=1, "",first_notable_rule_title),
+      first_notable_security_domain=if(count=1, "",first_notable_security_domain),
+      first_notable_severity=if(count=1, "",first_notable_severity),
+      first_notable_verbose=if(count=1, "",first_notable_verbose)
+
+		|search title="$title_tok$"
+		
+     | table title, count, changed, status, eai:acl.app, first_creation_date,last_creation_date, creation_date_c, first_modification_date, last_modification_date, modification_date_c, first_description, last_description, description_c, first_disabled, last_disabled, disabled_c, first_search, last_search, search_c, title, count, changed, status, eai:acl.app, first_creation_date,last_creation_date, creation_date_c, first_modification_date, last_modification_date, modification_date_c, first_description, last_description, description_c, first_disabled, last_disabled, disabled_c, first_search, last_search, search_c, first_notable_default_disposition, last_notable_default_disposition , notable_default_disposition_c, first_notable_default_owner, last_notable_default_owner, notable_default_owner_c, first_notable_default_status, last_notable_default_status, notable_default_status_c, first_notable_drilldown_earliest_offset, last_notable_drilldown_earliest_offset, notable_drilldown_earliest_offset_c, first_notable_drilldown_latest_offset, last_notable_drilldown_latest_offset, notable_drilldown_latest_offset_c, first_notable_drilldown_name, last_notable_drilldown_name, notable_drilldown_name_c, first_notable_drilldown_search , last_notable_drilldown_search , notable_drilldown_search_c, first_notable_extract_artifacts , last_notable_extract_artifacts , notable_extract_artifacts_c, first_notable_extract_assets, last_notable_extract_assets, notable_extract_assets_c, first_notable_extract_identities, last_notable_extract_identities, notable_extract_identities_c, first_notable_nes_fields, last_notable_nes_fields, notable_nes_fields_c, first_notable_next_steps, last_notable_next_steps, notable_next_steps_c, first_notable_recommended_actions, last_notable_recommended_actions, notable_recommended_actions_c, first_notable_rule_description , last_notable_rule_description , notable_rule_description_c, first_notable_rule_title, last_notable_rule_title, notable_rule_title_c, first_notable_security_domain, last_notable_security_domain, notable_security_domain_c, first_notable_severity, last_notable_severity, notable_severity_c, first_notable_verbose, last_notable_verbose, notable_verbose_c
+
+		| rename
+			creation_date AS "creation date", first_creation_date AS "orig creation date", last_creation_date AS "updtd creation date", creation_date_c AS "creation date count", modification_date AS "modification date", first_modification_date AS "orig modification date", last_modification_date AS "updtd modification date", modification_date_c AS "modification date count", description AS "description", first_description AS "orig description", last_description AS "updtd description", description_c AS "description count", disabled AS "disabled", first_disabled AS "orig disabled",
+			last_disabled AS "updtd disabled", disabled_c AS "disabled count", search AS "search", first_search AS "orig search", last_search AS "updtd search", search_c AS "search count", notable_default_disposition AS "notable default disposition",
+			first_notable_default_disposition AS "orig notable default disposition", last_notable_default_disposition AS "updtd notable default disposition", notable_default_disposition_c AS "notable default disposition count",
+			notable_default_owner AS "notable default owner",
+			first_notable_default_owner AS "orig notable default owner",
+			last_notable_default_owner AS "updtd notable default owner",
+			notable_default_owner_c AS "notable default owner count",
+			notable_default_status AS "notable default status",
+			first_notable_default_status AS "orig notable default status",
+			last_notable_default_status AS "updtd notable default status",
+			notable_default_status_c AS "notable default status count",
+			notable_drilldown_earliest_offset AS "notable drilldown earliest offset", first_notable_drilldown_earliest_offset AS "orig notable drilldown earliest offset",
+			last_notable_drilldown_earliest_offset AS "updtd notable drilldown earliest offset", notable_drilldown_earliest_offset_c
+			AS "notable drilldown earliest offset count", notable_drilldown_latest_offset AS "notable drilldown latest
+			offset", first_notable_drilldown_latest_offset AS "orig notable drilldown latest offset", last_notable_drilldown_latest_offset AS "updtd notable drilldown latest offset",
+			notable_drilldown_latest_offset_c AS "notable drilldown latest offset count",
+			notable_drilldown_name AS "notable drilldown name",
+			first_notable_drilldown_name AS "orig notable drilldown name",
+			last_notable_drilldown_name AS "updtd notable drilldown name",
+			notable_drilldown_name_c AS "notable drilldown name count",
+			notable_drilldown_search AS "notable drilldown search",
+			first_notable_drilldown_search AS "orig notable drilldown search", last_notable_drilldown_search AS "updtd notable
+			drilldown search", notable_drilldown_search_c AS "notable drilldown search count",
+			notable_extract_artifacts AS "notable extract artifacts",
+			first_notable_extract_artifacts AS "orig notable extract artifacts", last_notable_extract_artifacts AS "updtd notable
+			extract artifacts", notable_extract_artifacts_c AS "notable extract artifacts count",
+			notable_extract_assets AS "notable extract assets",
+			first_notable_extract_assets AS "orig notable extract assets",
+			last_notable_extract_assets AS "updtd notable extract assets",
+			notable_extract_assets_c AS "notable extract assets count",
+			notable_extract_identities AS "notable extract identities",
+			first_notable_extract_identities AS "orig notable extract identities", 
+			last_notable_extract_identities AS "updtd notable extract identities",
+			notable_extract_identities_c AS "notable extract identities count",
+			notable_nes_fields AS "notable nes fields",
+			first_notable_nes_fields AS "orig notable nes fields",
+			last_notable_nes_fields AS "updtd notable nes fields",
+			notable_nes_fields_c AS "notable nes fields count",
+			notable_next_steps AS "notable next steps",
+			first_notable_next_steps AS "orig notable next steps",
+			last_notable_next_steps AS "updtd notable next steps",
+			notable_next_steps_c AS "notable next steps count",
+			notable_recommended_actions AS "notable recommended actions",
+			first_notable_recommended_actions AS "orig notable recommended actions", 
+			last_notable_recommended_actions AS "updtd notable recommended actions", 
+			notable_recommended_actions_c AS "notable recommended actions count",
+			notable_rule_description AS "notable rule description",
+			first_notable_rule_description AS "orig notable rule description", 
+			last_notable_rule_description AS "updtd notable rule description", 
+			notable_rule_description_c AS "notable rule description count",
+			notable_rule_title AS "notable rule title",
+			first_notable_rule_title AS "orig notable rule title",
+			last_notable_rule_title AS "updtd notable rule title",
+			notable_rule_title_c AS "notable rule title count",
+			notable_security_domain AS "notable security domain",
+			first_notable_security_domain AS "orig notable security domain",
+			last_notable_security_domain AS "updtd notable security domain",
+			notable_security_domain_c AS "notable security domain count",
+			notable_severity AS "notable severity", 
+			first_notable_severity AS "orig notable severity", 
+			last_notable_severity AS "updtd notable severity", 
+			notable_severity_c AS "notable severity count",
+			notable_verbose AS "notable verbose", 
+			first_notable_verbose AS "orig notable verbose", 
+			last_notable_verbose AS "updtd notable verbose", 
+			notable_verbose_c AS "notable verbose count", 
+			title AS Title
+			
+			
+		  </query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="Count">
+          <colorPalette type="list">[#F8BE34, #FFFFFF]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="creation_date_c">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="Mod Date Count">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="Desctiption Count">
+          <colorPalette type="list">[#FFFFFF, #F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="Disabled Status Count">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+        <format type="color" field="Search Count">
+          <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
+          <scale type="threshold">2</scale>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

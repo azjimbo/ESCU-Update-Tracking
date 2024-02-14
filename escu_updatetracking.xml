@@ -69,7 +69,7 @@
       <label>Only these changes</label>
       <choice value="&quot;Search&quot;">Search</choice>
       <choice value="&quot;Added/Removed&quot;">Added/Removed</choice>
-      <!--     <choice value="&quot;Creation Date&quot;">Creation Date</choice> -->
+      <!--     <choice value="&quot;Creation Date&quot;">Creation Date</choice>  -->
       <choice value="&quot;Description&quot;">Description</choice>
       <choice value="&quot;Disabled/Enabled State&quot;">Disabled/Enabled State</choice>
       <choice value="*">All</choice>

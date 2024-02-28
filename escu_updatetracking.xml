@@ -13,7 +13,7 @@
           [| inputlookup $source_tokM2$
           | search title="*Rule"
           ]
-        | where NOT match(title, "($exclude$)") AND 'eai:acl.app'!="$app_tok$"
+        | where NOT match(title, "($exclude$)") AND 'eai:acl.app'="$app_tok$"
 
         | stats
         first(description) as first_description first(disabled) as first_disabled

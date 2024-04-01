@@ -1,18 +1,32 @@
-<form version="2.0">
+<form version="2.1">
   <label>ES Content Update Change Tracking (with notable tracking)</label>
-  <!--Created by James Callahan www.professionalparanoid.com 12 Feb 2024-->
+  <!--Created by James Callahan www.professionalparanoid.com 12 Feb 2024- 
+  updated 20 March 2024 - broke out added and removed into seperate items by adding the version eval 1 or 2 to the inputlookup for the csvs.
+  many of the complex and or long field stansas below were made using excel and forumlas - I didn't hand poke all of of them.  
+  -->
   <description>Used to identify changes to available searches between updates</description>
   <init>
     <set token="title_tok">*</set>
   </init>
-	  <search id="escu_base">
+  
+    <search id="csv_compare">
+    <query>
+       | inputlookup $source_tokM1$
+       ``` | search title="*Rule"```
+      | eval version="1"
+      
+     | append
+      [| inputlookup $source_tokM2$
+        ```  | search title="*Rule"```
+      | eval version="2"
+      ]
+      </query>
+    <earliest>-4h</earliest>
+    <latest>now</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <search base="csv_compare" id="escu_base">
 		<query>
-	| inputlookup $source_tokM1$
-	| search title="*Rule"
-	| append
-	[| inputlookup $source_tokM2$
-	| search title="*Rule"
-	]
 	| where NOT match(title, "($exclude$)")
 
 	| stats values(eai:acl.app) AS eai:acl.app,
@@ -85,7 +99,9 @@
 		first(notable_verbose) as first_notable_verbose,
 		last(notable_verbose) as last_notable_verbose,
 		dc(notable_verbose) as notable_verbose_c
+		dc(version) as verDC values(version) count(eval(version="1")) as ver1c
 		count by title
+		
 
 	| search (count=1 OR
 		creation_date_c&gt;1 OR
@@ -112,37 +128,40 @@
 		notable_severity_c&gt;1 OR
 		notable_verbose_c&gt;1)
 
-	| eval changed=case(
-		count=1, "Added/Removed",
-		search_c&gt;1, "search",
-		description_c&gt;1, "Description",
-		disabled_c&gt;1, "Disabled/Enabled State",
-		notable_default_disposition_c&gt;1, "in notable",
-		notable_default_owner_c&gt;1, "in notable",
-		notable_default_status_c&gt;1, "in notable",
-		notable_drilldown_earliest_offset_c&gt;1, "in notable",
-		notable_drilldown_latest_offset_c&gt;1, "in notable",
-		notable_drilldown_name_c&gt;1, "in notable",
-		notable_drilldown_search_c&gt;1, "in notable",
-		notable_extract_artifacts_c&gt;1, "in notable",
-		notable_extract_assets_c&gt;1, "in notable",
-		notable_extract_identities_c&gt;1, "in notable",
-		notable_nes_fields_c&gt;1, "in notable",
-		notable_next_steps_c&gt;1, "in notable",
-		notable_recommended_actions_c&gt;1, "in notable",
-		notable_rule_description_c&gt;1, "in notable",
-		notable_rule_title_c&gt;1, "in notable",
-		notable_security_domain_c&gt;1, "in notable",
-		notable_severity_c&gt;1, "in notable",
-		notable_verbose_c&gt;1, "in notable"
-		)
 
-	| eval status=if(last_disabled=0, "Enabled", "Disabled")
-	| search $chngd$
+ | eval changed=""        
+ |  eval changed=case(verDC="1" AND ver1c="1","Removed", verDC="1" AND ver1c="0","Added", 1=1,changed) 
+
+ | eval
+ changed=if(search_c>1, changed."search"."|", changed),
+changed=if(description_c>1, changed."Description"."|", changed),
+changed=if(disabled_c>1, changed."Disabled/Enabled State"."|", changed),
+    changed=if(modification_date_c>1,changed."Modification Date"."|",changed),
+changed=if(notable_default_disposition_c>1, changed."in notable"."|", changed),
+changed=if(notable_default_owner_c>1, changed."in notable"."|", changed),
+changed=if(notable_default_status_c>1, changed."in notable"."|", changed),
+changed=if(notable_drilldown_earliest_offset_c>1, changed."in notable"."|", changed),
+changed=if(notable_drilldown_latest_offset_c>1, changed."in notable"."|", changed),
+changed=if(notable_drilldown_name_c>1, changed."in notable"."|", changed),
+changed=if(notable_drilldown_search_c>1, changed."in notable"."|", changed),
+changed=if(notable_extract_artifacts_c>1, changed."in notable"."|", changed),
+changed=if(notable_extract_assets_c>1, changed."in notable"."|", changed),
+changed=if(notable_extract_identities_c>1, changed."in notable"."|", changed),
+changed=if(notable_nes_fields_c>1, changed."in notable"."|", changed),
+changed=if(notable_next_steps_c>1, changed."in notable"."|", changed),
+changed=if(notable_recommended_actions_c>1, changed."in notable"."|", changed),
+changed=if(notable_rule_description_c>1, changed."in notable"."|", changed),
+changed=if(notable_rule_title_c>1, changed."in notable"."|", changed),
+changed=if(notable_security_domain_c>1, changed."in notable"."|", changed),
+changed=if(notable_severity_c>1, changed."in notable"."|", changed),
+changed=if(notable_verbose_c>1, changed."in notable"."|", changed)
+
+| makemv delim="|" changed
+| eval status=if(last_disabled=0, "Enabled", "Disabled")  
+
+| search $chngd$   eai:acl.app IN("$app_tok$")
+
 </query>
-    <earliest>-4h</earliest>
-    <latest>now</latest>
-    <sampleRatio>1</sampleRatio>
   </search>
   <fieldset submitButton="true">
     <input type="dropdown" token="source_tokM1">
@@ -154,7 +173,7 @@
 		| rest /services/data/lookup-table-files
 		| search title="*ESCU*ver*"
 		| rex field=title "ESCU\_(?&lt;dtg&gt;.*)\_ESCU(\_?)ver\_(?&lt;ver&gt;.*)\.csv"
-		| eval timesort=strptime(dtg, "%H_%2M_%d-%b-%Y")
+		| eval timesort=strptime(dtg, "%H_%M_%d-%b-%Y")
 		| sort - timesort
 		| table timesort dtg ver title eai:userName
 		| eval file_choice=(ver+" from "+dtg)
@@ -180,8 +199,9 @@
     <input type="dropdown" token="chngd" searchWhenChanged="true">
       <label>Only these changes</label>
       <choice value="&quot;search&quot;">Search</choice>
-      <choice value="&quot;Added/Removed&quot;">Added/Removed</choice>
       <choice value="&quot;Description&quot;">Description</choice>
+      <choice value="&quot;Added&quot;">Added</choice>
+      <choice value="&quot;Removed&quot;">Removed</choice>
       <choice value="&quot;Disabled/Enabled State&quot;">Disabled/Enabled State</choice>
       <choice value="&quot;in notable&quot;">In Notable</choice>
       <choice value="*">All</choice>
@@ -190,15 +210,28 @@
       <default>*</default>
       <initialValue>*</initialValue>
     </input>
-    <input type="radio" token="reset_tok" searchWhenChanged="true" id="radiosample">
+    
+    <input type="multiselect" token="app_tok" searchWhenChanged="true">
+      <label>App Select</label>
+      <choice value="*">All</choice>
+      <fieldForLabel>eai:acl.app</fieldForLabel>
+      <fieldForValue>eai:acl.app</fieldForValue>
+      <search base="csv_compare">
+        <query>|dedup eai:acl.app
+|table eai:acl.app</query>
+      </search>
+      <delimiter>", "</delimiter>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>    
+    <input type="checkbox" token="reset_tok" searchWhenChanged="true" id="reset">
       <label>Title Token Reset</label>
-      <choice value="retain">keep</choice>
       <choice value="reset">reset</choice>
       <default>retain</default>
       <change>
         <condition value="reset">
           <set token="title_tok">*</set>
-          <set token="reset_tok">retain</set>
+          <unset token="form.reset_tok">retain</unset>
         </condition>
       </change>
     </input>
@@ -224,7 +257,7 @@
 	<P> 
 	<a href="/manager/search/data/lookup-table-files?search=ESCU" target="_blank">Manage the csv files</a>
 	</P>
-	<p>Open csv file in new tab: |inputlookup <a href="./search?q=%7C%20inputlookup%20$source_tokM1$" target="_blank">$source_tokM1$</a> or second file: |inputlookup
+	<p>Open selected csv file(s) in new tab: |inputlookup <a href="./search?q=%7C%20inputlookup%20$source_tokM1$" target="_blank">$source_tokM1$</a> or second file: |inputlookup
 	<a href=". /search?q=%7C%20inputlookup%20$source_tokM2$" target="_blank">$source_tokM2$</a> </p>
 	</details>
 	<details>
@@ -259,20 +292,51 @@
   </row>
   <row>
     <panel>
+      <single>
+        <title>Unique Titles in both CSVs by App</title>
+        <search base="csv_compare">
+          <query>
+        | dedup title
+        | stats count by eai:acl.app</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="height">138</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">small</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Change Tracking (filtered from. Exclude above)
 		|$source_tokM1$ and $source_tokM2$</title>
       <table>
         <search base="rollup_base">
           <query>
-			| stats count(eval(status="Enabled")) as "Changes to Enabled", 
+			| stats 
+      count(eval(changed="Added")) as "Added",
+      count(eval(changed="Removed")) as "Removed",
+      count(eval(status="Enabled")) as "Changes to Enabled", 
 			count(eval(status="Disabled")) as "Changes to Disabled",
 			count(eval(changed="Search")) as "Search Changed", 
 			count(eval(changed="Description")) as "Description Changed" , 
-			count(eval(changed="Disabled/Enabled State")) as "State Changed", 
-			count(eval (changed="Added/Removed")) as "Added/Removed"
+			count(eval(changed="Disabled/Enabled State")) as "State Changed",   		
 			count(eval(changed="In Notable")) as "In Notable", 
 			dc(title) as "Total Titles with Changes"
-		  </query>
+			</query>
         </search>
         <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
@@ -367,8 +431,11 @@
 
 		|search title="$title_tok$"
 		
-     | table title, count, changed, status, eai:acl.app, first_creation_date,last_creation_date, creation_date_c, first_modification_date, last_modification_date, modification_date_c, first_description, last_description, description_c, first_disabled, last_disabled, disabled_c, first_search, last_search, search_c, title, count, changed, status, eai:acl.app, first_creation_date,last_creation_date, creation_date_c, first_modification_date, last_modification_date, modification_date_c, first_description, last_description, description_c, first_disabled, last_disabled, disabled_c, first_search, last_search, search_c, first_notable_default_disposition, last_notable_default_disposition , notable_default_disposition_c, first_notable_default_owner, last_notable_default_owner, notable_default_owner_c, first_notable_default_status, last_notable_default_status, notable_default_status_c, first_notable_drilldown_earliest_offset, last_notable_drilldown_earliest_offset, notable_drilldown_earliest_offset_c, first_notable_drilldown_latest_offset, last_notable_drilldown_latest_offset, notable_drilldown_latest_offset_c, first_notable_drilldown_name, last_notable_drilldown_name, notable_drilldown_name_c, first_notable_drilldown_search , last_notable_drilldown_search , notable_drilldown_search_c, first_notable_extract_artifacts , last_notable_extract_artifacts , notable_extract_artifacts_c, first_notable_extract_assets, last_notable_extract_assets, notable_extract_assets_c, first_notable_extract_identities, last_notable_extract_identities, notable_extract_identities_c, first_notable_nes_fields, last_notable_nes_fields, notable_nes_fields_c, first_notable_next_steps, last_notable_next_steps, notable_next_steps_c, first_notable_recommended_actions, last_notable_recommended_actions, notable_recommended_actions_c, first_notable_rule_description , last_notable_rule_description , notable_rule_description_c, first_notable_rule_title, last_notable_rule_title, notable_rule_title_c, first_notable_security_domain, last_notable_security_domain, notable_security_domain_c, first_notable_severity, last_notable_severity, notable_severity_c, first_notable_verbose, last_notable_verbose, notable_verbose_c
+		|  eval changed=case(verDC="1" AND ver1c="1","Removed",verDC="1" AND ver1c="0","Added",1=1,changed)
 
+     | table title, count, changed, status, eai:acl.app, first_creation_date,last_creation_date, creation_date_c, first_modification_date, last_modification_date, modification_date_c, first_description, last_description, description_c, first_disabled, last_disabled, disabled_c, first_search, last_search, search_c, first_notable_default_disposition, last_notable_default_disposition , notable_default_disposition_c, first_notable_default_owner, last_notable_default_owner, notable_default_owner_c, first_notable_default_status, last_notable_default_status, notable_default_status_c, first_notable_drilldown_earliest_offset, last_notable_drilldown_earliest_offset, notable_drilldown_earliest_offset_c, first_notable_drilldown_latest_offset, last_notable_drilldown_latest_offset, notable_drilldown_latest_offset_c, first_notable_drilldown_name, last_notable_drilldown_name, notable_drilldown_name_c, first_notable_drilldown_search , last_notable_drilldown_search , notable_drilldown_search_c, first_notable_extract_artifacts , last_notable_extract_artifacts , notable_extract_artifacts_c, first_notable_extract_assets, last_notable_extract_assets, notable_extract_assets_c, first_notable_extract_identities, last_notable_extract_identities, notable_extract_identities_c, first_notable_nes_fields, last_notable_nes_fields, notable_nes_fields_c, first_notable_next_steps, last_notable_next_steps, notable_next_steps_c, first_notable_recommended_actions, last_notable_recommended_actions, notable_recommended_actions_c, first_notable_rule_description , last_notable_rule_description , notable_rule_description_c, first_notable_rule_title, last_notable_rule_title, notable_rule_title_c, first_notable_security_domain, last_notable_security_domain, notable_security_domain_c, first_notable_severity, last_notable_severity, notable_severity_c, first_notable_verbose, last_notable_verbose, notable_verbose_c
+
+    ```these renames help collapse the column names so that they can be presented in the dashboard without taking up too much horizontal scroll```
 		| rename
 			creation_date AS "creation date", first_creation_date AS "orig creation date", last_creation_date AS "updtd creation date", creation_date_c AS "creation date count", modification_date AS "modification date", first_modification_date AS "orig modification date", last_modification_date AS "updtd modification date", modification_date_c AS "modification date count", description AS "description", first_description AS "orig description", last_description AS "updtd description", description_c AS "description count", disabled AS "disabled", first_disabled AS "orig disabled",
 			last_disabled AS "updtd disabled", disabled_c AS "disabled count", search AS "search", first_search AS "orig search", last_search AS "updtd search", search_c AS "search count", notable_default_disposition AS "notable default disposition",

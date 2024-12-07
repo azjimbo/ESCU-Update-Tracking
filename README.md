@@ -3,3 +3,5 @@ Splunk Threat Research team (STRT) does a good job at keeping up with new analy
 These work off an embedded csv generating query (under 'Overview' in the Guidance panel).  To make this dashboard work, run this twice.  Once before and once after pushing the update.  Then select as the first source csv the earlier of those two, then the post update as the 'csv to compare'.  Hit submit and wha-la! There's your deltas between the two versions.
 
 These also can serve as a backup of your saved searches/correlation searches.
+
+Updated the non-w/notable one to include drilldown for updated search in new tab.

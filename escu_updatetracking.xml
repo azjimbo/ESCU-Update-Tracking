@@ -5,38 +5,60 @@
   <init>
     <set token="title_tok">*</set>
   </init>
-  <search id="escu_base">
+  <search id="csv_compare">
     <query>
-       | inputlookup $source_tokM1$
-        | search title="*Rule"
-        | append
-          [| inputlookup $source_tokM2$
-          | search title="*Rule"
-          ]
-        | where NOT match(title, "($exclude$)") AND 'eai:acl.app'="$app_tok$"
+          | inputlookup $source_tokM1$
+       ``` | search title="*Rule"```
+          | eval version="1"       
+          | append
+         [| inputlookup $source_tokM2$
+        ```  | search title="*Rule"```
+          | eval version="2"
+         ]
+        | where NOT match(title, "($exclude$)") 
+      </query>
+    <earliest>-4h</earliest>
+    <latest>now</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <search base="csv_compare" id="escu_base">
+    <query>
 
         | stats
         first(description) as first_description first(disabled) as first_disabled
         first(modification_date) as first_modification_date  first(search) as first_search
         last(description) as last_description last(disabled) as last_disabled last(modification_date) as last_modification_date last(search) as last_search dc(description) as description_c dc(disabled) as disabled_c
         dc(modification_date) as modification_date_c  dc(search) as search_c
-        count by title        
+        dc(version) as verDC values(version) count(eval(version="1")) as ver1c
+        
+        count by title  eai:acl.app      
 
- | search (description_c&gt;1 OR disabled_c&gt;1 OR modification_date_c&gt;1 OR search_c&gt;1 OR count=1) 
-        | table count title  first_modification_date last_modification_date modification_date_c first_description last_description description_c first_disabled last_disabled disabled_c first_search last_search search_c
-                | eval changed=""
-        | eval changed=if(count=1,changed."Added/Removed"."|",changed),
+        | search (description_c&gt;1 OR disabled_c&gt;1 OR modification_date_c&gt;1 OR search_c&gt;1 OR count=1) 
+        
+        eai:acl.app IN("$app_tok$")
+        
+        | table count title  first_modification_date last_modification_date modification_date_c first_description last_description description_c first_disabled last_disabled disabled_c first_search,ver1c,verDC last_search search_c eai:acl.app
+        | eval changed=""
+        | eval changed=case(verDC="1" AND ver1c="1","Removed", verDC="1" AND ver1c="0","Added", 1=1,changed) 
+        
+        | eval ```changed=if(count=1,changed."Added/Removed"."|",changed),```
         changed=if(disabled_c&gt;1,changed."Disabled/Enabled State"."|",changed),
         changed=if(search_c&gt;1,changed."Search"."|",changed),
         changed=if(description_c&gt;1,changed."Description"."|",changed),
         changed=if(modification_date_c&gt;1,changed."Modification Date"."|",changed)
         | makemv delim="|" changed
         | eval status=if(last_disbaled=0,"Enabled","Disabled"),changed_count=mvcount(changed)
-        | search count=1 OR changed_count&gt;0
+        
+        | search count=1 OR changed_count&gt;0 $chngd$
+
+
+
+```     | search (description_c&gt;1 OR disabled_c&gt;1 OR modification_date_c&gt;1 OR search_c&gt;1 OR count=1) eai:acl.app="$app_tok$"
+        | table count title  first_modification_date last_modification_date modification_date_c first_description last_description description_c first_disabled last_disabled disabled_c first_search last_search search_c
+        | eval changed=case(disabled_c=2, "Disabled/Enabled State",search_c=2, "Search", description_c=2, "Description", modification_date_c=2,"Modifiction Date", count=1, "Added/Removed")
+        | eval status=if(last_disabled=0,"Enabled", "Disabled")
+        | search $chngd$  ```
       </query>
-    <earliest>-4h</earliest>
-    <latest>now</latest>
-    <sampleRatio>1</sampleRatio>
   </search>
   <fieldset submitButton="true">
     <input type="dropdown" token="source_tokM1">
@@ -74,7 +96,8 @@
     <input type="dropdown" token="chngd" searchWhenChanged="true">
       <label>Only these changes</label>
       <choice value="&quot;Search&quot;">Search</choice>
-      <choice value="&quot;Added/Removed&quot;">Added/Removed</choice>
+      <choice value="&quot;Added&quot;">Added</choice>
+      <choice value="&quot;Removed&quot;">Removed</choice>
       <!--     <choice value="&quot;Creation Date&quot;">Creation Date</choice> -->
       <choice value="&quot;Description&quot;">Description</choice>
       <choice value="&quot;Disabled/Enabled State&quot;">Disabled/Enabled State</choice>
@@ -89,31 +112,22 @@
       <choice value="*">All</choice>
       <fieldForLabel>eai:acl.app</fieldForLabel>
       <fieldForValue>eai:acl.app</fieldForValue>
-      <search>
-        <query>
-       | inputlookup $source_tokM1$
-        | search title="*Rule"
-        | append
-          [| inputlookup $source_tokM2$
-          | search title="*Rule"
-          ]
-        | where NOT match(title, "($exclude$)")
-          | dedup  eai:acl.app 
-| table eai:acl.app</query>
+      <search base="csv_compare">
+        <query>|dedup eai:acl.app
+|table eai:acl.app</query>
       </search>
+      <delimiter>", "</delimiter>
       <default>*</default>
       <initialValue>*</initialValue>
-      <delimiter> </delimiter>
     </input>
-    <input type="radio" token="reset_tok" searchWhenChanged="true" id="radiosample">
+    <input type="checkbox" token="reset_tok" searchWhenChanged="true" id="reset">
       <label>Title Token Reset</label>
-      <choice value="retain">keep</choice>
       <choice value="reset">reset</choice>
       <default>retain</default>
       <change>
         <condition value="reset">
           <set token="title_tok">*</set>
-          <set token="reset_tok">retain</set>
+          <unset token="form.reset_tok">retain</unset>
         </condition>
       </change>
     </input>
@@ -178,11 +192,41 @@ since the last time the query was run.</P>
   </row>
   <row>
     <panel>
+      <single>
+        <title>Unique Titles in both CSVs by App</title>
+        <search base="csv_compare">
+          <query>
+        | dedup title
+        | stats count by eai:acl.app</query>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="height">138</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">small</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Change Tracking (filtered from Exclude above) |$source_tokM1$ and $source_tokM2$</title>
       <table>
         <search base="rollup_base">
           <query>
-            |  stats count(eval(status="Enabled")) as "Changes to Enabled",count(eval(status="Disabled")) as "Changes to Disabled", count(eval(changed="Search")) as "Search Changed",count(eval(changed="Description")) as "Description Changed",count(eval(changed="Disabled/Enabled State")) as "State Changed",count(eval(changed="Added/Removed")) as "Added/Removed" dc(title) as "Total Searches with Delta"  
+            |  stats count(eval(changed="Added")) as "Added",count(eval(changed="Removed")) as "Removed",
+            count(eval(status="Enabled")) as "Changes to Enabled",count(eval(status="Disabled")) as "Changes to Disabled", count(eval(changed="Search")) as "Search Changed",count(eval(changed="Description")) as "Description Changed",count(eval(changed="Disabled/Enabled State")) as "State Changed",dc(title) as "Total Searches with Delta"  
           </query>
         </search>
         <option name="count">1</option>
@@ -222,12 +266,25 @@ since the last time the query was run.</P>
   </row>
   <row>
     <panel>
-      <title>Details</title>
+      <title>Details (drilldown to run the Updated Search in new tab)</title>
       <table>
         <search base="escu_base">
           <query>
         
          |search title="$title_tok$" 
+         
+         | eval first_modification_date=if(changed="Added","",first_modification_date),
+       last_modification_date=if(changed="Removed","",last_modification_date),  
+       first_description=if(changed="Added","",first_description), 
+       last_description=if(changed="Removed","",last_description),  
+       first_disabled=if(changed="Added","",first_disabled), 
+       last_disabled =if(changed="Removed","",last_disabled), 
+       first_search=if(changed="Added","",first_search), 
+       last_search=if(changed="Removed","",last_search)  
+         
+            | table  title changed eai:acl.app  first_modification_date last_modification_date  first_description last_description  first_disabled last_disabled  first_search, last_search 
+            
+            | eval last_srch=last_search
 
             | rename   first_modification_date as "Orig Mod Date", last_modification_date as "Updated Mod Date", modification_date_c as "Mod Date Count",
             first_description as "Orig Descrption", last_description as "Updated Description", description_c as "Desctiption Count",
@@ -236,15 +293,19 @@ since the last time the query was run.</P>
             status AS Status, changed AS Changed, count AS Count, title AS Title
 
           </query>
+           <done>
+            <set token="srch">$result.last_srch$</set>
+           </done>
         </search>
         <option name="count">20</option>
         <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
+        <option name="drilldown">row</option>
         <option name="percentagesRow">false</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
         <format type="color" field="Count">
+
           <colorPalette type="list">[#F8BE34,#FFFFFF]</colorPalette>
           <scale type="threshold">2</scale>
         </format>
@@ -268,6 +329,10 @@ since the last time the query was run.</P>
           <colorPalette type="list">[#FFFFFF,#F8BE34]</colorPalette>
           <scale type="threshold">2</scale>
         </format>
+        <fields>["Title","Changed","eai:acl.app","Orig Mod Date","Updated Mod Date","Orig Descrption","Updated Description","Orig Disabled Status","Updated Disabled Status","Orig Search","Updated Search"]</fields>
+        <drilldown>
+          <link target="_blank">search?q=$srch$</link>
+        </drilldown>
       </table>
     </panel>
   </row>

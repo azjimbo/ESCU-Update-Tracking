@@ -1,6 +1,8 @@
-<form version="1.3">
+<form version="1.2">
   <label>ES Content Update Change Tracking</label>
   <!--Created by James Callahan www.professionalparanoid.com 3 Feb 2024-->
+  
+  <!--Working on getting the colors in the columns that changed -->
   <description>Used to identify changes to available searches between updates</description>
   <init>
     <set token="title_tok">*</set>
@@ -154,7 +156,9 @@ since the last time the query was run.</P>
 
 <a class="btn default edit-cancel" href="./search?earliest=1517461200&amp;latest=1712203200&amp;q=%7C%20rest%20%2Fservices%2Fsaved%2Fsearches%20splunk_server%3Dlocal%20count%3D0%0A%7C%20rename%20%22action.escu.creation_date%22%20as%20creation_date%2C%20action.escu.modification_date%20AS%20modification_date%0A%7C%20eval%20datesort%3Dstrptime(creation_date%2C%20%22%25Y-%25m-%25d%22)%2Cmodsort%3Dstrptime(modification_date%2C%22%25Y-%25m-%25d%22)%0A%7C%20table%20datesort%20modsort%20creation_date%20modification_date%20eai%3Aacl.app%20title%20description%20disabled%20search%0A%7C%20sort%20-%20datesort%0A%0A%60%60%60uncomment%20the%20below%20after%20confirming%20that%20the%20above%20query%20works.%60%60%60%0A%60%60%60%7C%20outputlookup%20%0A%5B%7C%20rest%20%2Fservices%2Fconfigs%2Fconf-content-version%20splunk_server%3Dlocal%20count%3D0%20%7C%20table%20version%0A%7C%20eval%20nowers%3Dstrftime(now()%2C%22%25H%3A%25M_%25d-%25b-%25Y%22 )%20%0A%7C%20eval%20filename%3D%22ESCU_%22%2Bnowers%2B%22_ESCU_ver_%22%2Bversion%2B%22.csv%22%0A%20%20%20%20%7C%20return%20%24filename%5D%60%60%60" target="_blank">Open CSV Generating Query In New Tab</a> <br/>
 <P>
-  <a href="/manager/search/data/lookup-table-files?search=ESCU_v" target="_blank">Manage the csv files</a>
+
+  <a href="/manager/search/data/lookup-table-files?ns=-&amp;app_only=0&amp;pwnr=-&amp;search=ESCU_v&amp;count=100" target="_blank">Manage the csv files</a>
+  
 </P>
 <p>
   Open csv file in new tab: |inputlookup <a href="./search?q=%7C%20inputlookup%20$source_tokM1$" target="_blank">$source_tokM1$</a>  or second file: |inputlookup <a href="./search?q=%7C%20inputlookup%20$source_tokM2$" target="_blank">$source_tokM2$</a>
